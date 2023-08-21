@@ -133,6 +133,24 @@ end
 
 confusion_matrix(classes,pred,obs) = [count((pred.==i) .&& (obs.==j)) for i in classes, j in classes]
 
+
+"""
+    compare_result(T,sz,device,model,nbands,nclasses,val_X,basedir,resdir;
+                        batchsize = 8, doplot = true,
+                        predicted_classes = nothing,
+                        mean_bands = nothing,
+                        std_bands = nothing,
+                        )
+
+If `predicted_classes` is not nothing, is should be a 3D arrays of the correct size
+to save the predicted classes.
+
+For example
+
+```julia
+predicted_classes = zeros(Int8,sz...,length(train_X))
+```
+"""
 function compare_result(T,sz,device,model,nbands,nclasses,val_X,basedir,resdir;
                         batchsize = 8, doplot = true,
                         predicted_classes = nothing,
