@@ -1,6 +1,7 @@
 include("litter_classification.jl")
 
 timestamp = "20230215T223530"
+timestamp = "20230422T104137"
 
 device = gpu
 
@@ -63,6 +64,10 @@ metrics = pyimport("sklearn.metrics")
 isclassified = val_classes .!== nclasses;
 metrics.jaccard_score(val_classes[isclassified],
                       val_predicted_classes[isclassified],average="macro")
+
+
+metrics.f1_score(val_classes[isclassified],
+                 val_predicted_classes[isclassified],average="macro")
 
 
 metrics.jaccard_score(val_classes[isclassified],
