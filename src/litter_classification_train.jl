@@ -1,5 +1,7 @@
 include("litter_classification.jl")
 
+
+# train the neural network to classify marine litter
 function main(T,sz,
               basedir,
               train_X,

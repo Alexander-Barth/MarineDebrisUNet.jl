@@ -1,7 +1,9 @@
 #ENV["DISPLAY"] = ""
 
+# julia environement
 using Pkg
 Pkg.activate("litter",shared=true)
+
 
 using ArchGDAL
 using BSON
@@ -18,6 +20,7 @@ using Interpolations
 using JSON3
 using DataFrames
 
+# load a single TIFF file and concatenate all bands
 function load(fname)
     raster = ArchGDAL.read(fname)
     data = cat([Matrix(ArchGDAL.getband(raster, i)) for i = 1:ArchGDAL.nraster(raster)]...,
@@ -25,8 +28,11 @@ function load(fname)
     #@show typeof(data)
     return data
 end
+
+# convert to Int 8 class index (1-based)
 to_class(c) = Int8(c) + 1
 
+# load a batch of files under the directory basedir
 function loadbatch!(T,basedir,train_X,sz,nbands,idx,bands,confidence,classes,class_mapping)
     fun(x) = class_mapping[Int8(x)]
     for (li,i) in enumerate(idx)
@@ -46,7 +52,7 @@ function loadbatch!(T,basedir,train_X,sz,nbands,idx,bands,confidence,classes,cla
 end
 
 
-"θ is in degress"
+# rotate the image `bands` by θ (in degress)
 function rotate_center!(bands_rot,bands,θ,extrapval)
     sinθ,cosθ = sincosd(θ)
     sz = size(bands)
@@ -67,8 +73,10 @@ function rotate_center!(bands_rot,bands,θ,extrapval)
     end
 end
 
+# concatenate channels
 cat_channels(mx,x) = cat(mx, x, dims=3)
 
+# helper function to show the size of a layer
 function showsize(tag)
     return function s(x)
         @show tag,size(x)
@@ -76,6 +84,7 @@ function showsize(tag)
     end
 end
 
+# individual block of a UNet
 function unet_block(l,nchannels,nbands,nclasses,activation)
     nchan = nchannels[l]
     last_activation = activation
@@ -119,7 +128,7 @@ function unet_block(l,nchannels,nbands,nclasses,activation)
     )
 end
 
-
+# plot the matrix classes
 function classplot(classes; nclasses = 12, unclassified = nclasses)
     c = Float64.(copy(classes))
 
@@ -131,6 +140,7 @@ function classplot(classes; nclasses = 12, unclassified = nclasses)
 end
 
 
+# compute the confusion matrix
 confusion_matrix(classes,pred,obs) = [count((pred.==i) .&& (obs.==j)) for i in classes, j in classes]
 
 
@@ -236,6 +246,7 @@ function compare_result(T,sz,device,model,nbands,nclasses,val_X,basedir,resdir;
     return (; mean_IoU, IoU, CM)
 end
 
+# add noise to bands with the prescribed standard deviation
 function addnoise!(bands,stddev)
     @inbounds for i in eachindex(bands)
         bands[i] += stddev * randn(eltype(bands))
