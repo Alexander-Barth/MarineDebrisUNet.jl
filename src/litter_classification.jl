@@ -1,24 +1,18 @@
-#ENV["DISPLAY"] = ""
-
-# julia environement
-using Pkg
-Pkg.activate("litter",shared=true)
-
-
 using ArchGDAL
 using BSON
 using Base.Iterators: partition
+using CUDA
+using DataFrames
 using DataStructures
 using Dates
 using Flux
+using Interpolations
+using JSON3
 using OneHotArrays
 using PyPlot
 using Random
 using Statistics
 using Zygote
-using Interpolations
-using JSON3
-using DataFrames
 
 # load a single TIFF file and concatenate all bands
 function load(fname)
@@ -315,7 +309,7 @@ class_mapping = Dict{Int8,Int8}(
 
 # basedir is assumed to have the directories splits and patches
 
-basedir = expanduser("~/Data/MARIDA_dataset")
+basedir = get(ENV,"MARIDA_DATASET",expanduser("~/Data/MARIDA_dataset"))
 train_X = readlines(joinpath(basedir,"splits/train_X.txt"))
 test_X = readlines(joinpath(basedir,"splits/test_X.txt"))
 val_X = readlines(joinpath(basedir,"splits/val_X.txt"))
