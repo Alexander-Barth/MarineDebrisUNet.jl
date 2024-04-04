@@ -3,7 +3,7 @@
 
 ## Installation
 
-* You need the julia programming language available at https://julialang.org/downloads/ (test code is tested with julia version 1.10.0)
+* You need the julia programming language available at https://julialang.org/downloads/ (the code is tested with julia version 1.10.0 on Linux with an NVIDIA GPU)
 * Clone this repo:
 
 ```bash
