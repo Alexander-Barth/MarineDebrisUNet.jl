@@ -1,10 +1,3 @@
-#ENV["DISPLAY"] = ""
-
-# julia environement
-using Pkg
-Pkg.activate("litter",shared=true)
-
-
 using ArchGDAL
 using BSON
 using Base.Iterators: partition
