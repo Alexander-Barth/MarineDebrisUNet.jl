@@ -1,17 +1,18 @@
 using ArchGDAL
 using BSON
 using Base.Iterators: partition
+using CUDA
+using DataFrames
 using DataStructures
 using Dates
 using Flux
+using Interpolations
+using JSON3
 using OneHotArrays
 using PyPlot
 using Random
 using Statistics
 using Zygote
-using Interpolations
-using JSON3
-using DataFrames
 
 # load a single TIFF file and concatenate all bands
 function load(fname)
