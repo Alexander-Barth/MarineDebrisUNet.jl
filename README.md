@@ -32,6 +32,14 @@ If this environment variable is not set, the data set is expected to in `~/Data/
 The data set must be uncompressed and the training script will expect for example the file `train_X.txt` to be located at
 `$MARIDA_DATASET/splits/train_X.txt`.
 
+This can be done using the following shell commands:
+
+```bash
+mkdir -p ~/Data/MARIDA_dataset
+cd ~/Data/MARIDA_dataset
+wget https://zenodo.org/records/5151941/files/MARIDA.zip
+unzip MARIDA.zip
+```
 
 ## Source code
 
