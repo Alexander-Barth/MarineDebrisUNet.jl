@@ -17,11 +17,12 @@ git clone https://github.com/Alexander-Barth/MarineDebrisUNet.jl
 
 ```julia
 using Pkg
-cd("MarineDebrisUNet.jl")
-Pkg.activate(".")
-Pkg.instantiate()
+cd("MarineDebrisUNet.jl")  # change the directory
+Pkg.activate(".")          # make MarineDebrisUNet.jl the current environement
+Pkg.instantiate()          # install all dependency in the current environement
 ```
 
+It is important to run these installation commands on the computer with the GPU.
 
 ## Dataset
 
