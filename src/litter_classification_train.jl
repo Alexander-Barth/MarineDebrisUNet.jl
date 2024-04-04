@@ -286,62 +286,29 @@ end
 
 Random.seed!(Dates.value(Dates.now()))
 
-lr = rand([0.0001,0.0003,0.001])
-nepochs = rand(300:2000)
-std_noise_bands = rand([0.0, 0.001, 0.01])
-clip_grad_value = rand([1e5, 5, 1, 1e-1, 1e-2])
-activation = rand([relu,selu,gelu])
+# # random search
+# lr = rand([0.0001,0.0003,0.001])
+# nepochs = rand(300:2000)
+# std_noise_bands = rand([0.0, 0.001, 0.01])
+# clip_grad_value = rand([1e5, 5, 1, 1e-1, 1e-2])
+# activation = rand([relu,selu,gelu])
 
-nchannels_base = rand(8:64)
-nchannels = (nchannels_base,nchannels_base*2,nchannels_base*4)
-#beta2 = T(10 .^ (-2 + -3 * rand()))
+# nchannels_base = rand(8:64)
+# nchannels = (nchannels_base,nchannels_base*2,nchannels_base*4)
+# #beta2 = T(10 .^ (-2 + -3 * rand()))
 
-#p2 = JSON3.read(read(expanduser("~/Data/MARIDA_dataset/20230422T104137/params.json"),String))
 
-p = JSON3.read(read(expanduser("~/Data/MARIDA_dataset/20230318T201117/params.json"),String))
-lr = p.lr
-nepochs = p.epoch
-std_noise_bands = p.std_noise_bands
-clip_grad_value = p.clip_grad_value
+
+# best values so far
+lr = 0.0001
+nepochs = 1746
+#nepochs = 2 # testing
 activation = selu
-
-nchannels_base = p.nchannels[1]
+nchannels_base = 64
 nchannels = (nchannels_base,nchannels_base*2,nchannels_base*4)
+std_noise_bands = 0
+clip_grad_value = 5
 beta2 = 0.f0
-
-
-params  = (lr=p.lr,
-           nepochs = p.epoch,
-           activation = selu,
-           nchannels_base = p.nchannels[1])
-
-
-other(x::AbstractFloat) = (.95*x,1.05*x)
-other(x::Integer) = round.(typeof(x),(.95*x,1.05*x))
-other(x::Function) = (relu,gelu)
-
-for (k,v) in pairs(params)
-    for v_pert = other(v)
-        @show k,v,v_pert
-        params_pert = merge(params,NamedTuple((k => v_pert,)))
-        @show params_pert
-
-        train_stat,val_stat,test_stat = main(
-            T,sz,basedir,train_X,test_X,val_X,class_mapping,nbands,nclasses;
-            std_noise_bands = std_noise_bands,
-            clip_grad_value = clip_grad_value,
-            params_pert...
-        )
-    end
-end
-
-#nepochs = 2
-
-
-#=
-display(DataFrame(class_names=class_names[1:end-1],IoU = test_stat.IoU))
-=#
-
 
 @time train_stat,val_stat,test_stat = main(
     T,sz,basedir,train_X,test_X,val_X,class_mapping,nbands,nclasses;
@@ -353,3 +320,38 @@ display(DataFrame(class_names=class_names[1:end-1],IoU = test_stat.IoU))
     beta2 = beta2,
     nchannels = nchannels,
 )
+
+# Fine Tuning
+
+# # read parameters from params.json file
+# paramsname = expanduser("~/Data/MARIDA_dataset/20230318T201117/params.json")
+# p = JSON3.read(read(paramsname,String))
+# lr = p.lr
+# nepochs = p.epoch
+# std_noise_bands = p.std_noise_bands
+# clip_grad_value = p.clip_grad_value
+
+# params  = (lr=p.lr,
+#            nepochs = p.epoch,
+#            activation = selu,
+#            nchannels_base = p.nchannels[1])
+
+
+# other(x::AbstractFloat) = (.95*x,1.05*x)
+# other(x::Integer) = round.(typeof(x),(.95*x,1.05*x))
+# other(x::Function) = (relu,gelu)
+
+# for (k,v) in pairs(params)
+#     for v_pert = other(v)
+#         @show k,v,v_pert
+#         params_pert = merge(params,NamedTuple((k => v_pert,)))
+#         @show params_pert
+
+#         train_stat,val_stat,test_stat = main(
+#             T,sz,basedir,train_X,test_X,val_X,class_mapping,nbands,nclasses;
+#             std_noise_bands = std_noise_bands,
+#             clip_grad_value = clip_grad_value,
+#             params_pert...
+#         )
+#     end
+# end
