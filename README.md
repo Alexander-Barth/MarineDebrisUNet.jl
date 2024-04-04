@@ -32,7 +32,7 @@ D --> C3(conv. 3x3)
 C3 --> C4(conv. 3x3)
 ```
 
-where conv. and trans. conv. are the 2D convolution and transposed convolution respectively.
+where conv. and trans. conv. are the 2D convolution (followed by an activation function) and transposed convolution respectively.
 The inner block is either the identity function (at the deepest level) or a block with the same structure as above.
 
 
