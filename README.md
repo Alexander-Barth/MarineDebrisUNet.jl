@@ -19,6 +19,17 @@ Pkg.activate(".")
 Pkg.instantiate()
 ```
 
+
+## Dataset
+
+
+The environement variable `MARIDA_DATASET` should contain the directory containing the
+[Marine Debris Archive (MARIDA)](https://zenodo.org/records/5151941#.YfFZ_PXP30o).
+If this environement variable is not set, the data set is expected to in `~/Data/MARIDA_dataset`.
+The data set must be uncompressed and the training script will expect for example the file `train_X.txt` to be located at
+`$MARIDA_DATASET/splits/train_X.txt`.
+
+
 ## Source code
 
 
