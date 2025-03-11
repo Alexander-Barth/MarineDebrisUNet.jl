@@ -32,11 +32,11 @@ D --> C3(conv. 3x3)
 C3 --> C4(conv. 3x3)
 ```
 
-where conv. and trans. conv. are the 2D convolution and transposed convolution respectively.
+where conv. and trans. conv. are the 2D convolution (followed by an activation function) and transposed convolution respectively.
 The inner block is either the identity function (at the deepest level) or a block with the same structure as above.
 
 
-The weights of the trained network are available at:  https://dox.ulg.ac.be/index.php/s/cPCMw5rjeX5gwTI and are distributed in the [BSON](https://en.wikipedia.org/wiki/BSON) format.
+The weights of the trained network are available at: https://dox.uliege.be/index.php/s/cPCMw5rjeX5gwTI and are distributed in the [BSON](https://en.wikipedia.org/wiki/BSON) format.
 The trained neural network is integrated into the [POS2IDON](https://github.com/AIRCentre/POS2IDON) pipeline.
 
 
