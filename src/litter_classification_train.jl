@@ -103,12 +103,13 @@ function main(T,sz,
 
     losses = []
 
-    parameters = Flux.params(model)
+    parameters = Flux.trainables(model)
 
 
     @info "parameters" lr nepochs std_noise_bands clip_grad_value activation mode nchannels seed beta1 beta2
 
-    opt = Flux.Optimiser(Flux.Optimise.ClipValue(clip_grad_value), ADAM(lr))
+    opt = OptimiserChain(Flux.Optimise.ClipValue(clip_grad_value), Flux.Adam(lr))
+    opt_state = Flux.setup(opt, model)
 
     Random.seed!(seed)
 
@@ -163,8 +164,8 @@ function main(T,sz,
 
             Y_without_unclassfied = Y[:,:,1:end-1,:]
 
-            loss,back = Flux.pullback(parameters) do
-                yhat = model(X);
+            loss,grads = Flux.withgradient(model) do m
+                yhat = m(X);
 
                 loss = sum(-sum(ww_without_unclassfied .* Y_without_unclassfied .* logsoftmax(yhat; dims=3); dims=3))
 
@@ -179,10 +180,9 @@ function main(T,sz,
 
             average_loss += loss
             average_count += 1
-            grads = back(T(1))
 
 
-            Flux.Optimise.update!(opt, parameters, grads)
+            Flux.update!(opt_state, model, grads[1])
         end
 
         # if n % 50 == 0
