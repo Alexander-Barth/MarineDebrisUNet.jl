@@ -18,7 +18,7 @@ val_predicted_classes = zeros(Int8,sz...,length(val_X))
 test_predicted_classes = zeros(Int8,sz...,length(test_X))
 
 doplot = false;
-resdir = joinpath(basedir,timestamp,"train-test")
+resdir = joinpath(basedir,timestamp,"train")
 train_stat = compare_result(T,sz,device,model,nbands,nclasses,train_X,basedir,resdir,
                             doplot = doplot,
                             mean_bands = mean_bands,
@@ -27,7 +27,7 @@ train_stat = compare_result(T,sz,device,model,nbands,nclasses,train_X,basedir,re
 
 
 val_predicted_classes = zeros(Int8,sz...,length(val_X))
-resdir = joinpath(basedir,timestamp,"val-test")
+resdir = joinpath(basedir,timestamp,"val")
 val_stat = compare_result(T,sz,device,model,nbands,nclasses,val_X,basedir,resdir;
                           doplot = doplot,
                           mean_bands = mean_bands,
@@ -35,7 +35,7 @@ val_stat = compare_result(T,sz,device,model,nbands,nclasses,val_X,basedir,resdir
                           predicted_classes = val_predicted_classes)
 
 test_predicted_classes = zeros(Int8,sz...,length(test_X))
-resdir = joinpath(basedir,timestamp,"test-test")
+resdir = joinpath(basedir,timestamp,"test")
 test_stat = compare_result(T,sz,device,model,nbands,nclasses,test_X,basedir,resdir,
                            doplot = doplot,
                            mean_bands = mean_bands,
