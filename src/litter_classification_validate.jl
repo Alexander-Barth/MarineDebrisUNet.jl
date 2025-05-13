@@ -2,6 +2,7 @@ include("litter_classification.jl")
 
 timestamp = "20230215T223530"
 timestamp = "20230422T104137"
+timestamp = "20250404T115717"
 
 device = gpu
 
@@ -56,7 +57,7 @@ end
 val_bands, val_confidence, val_classes = loadall(T,sz,nbands,val_X,basedir)
 test_bands, test_confidence, test_classes = loadall(T,sz,nbands,test_X,basedir)
 
-
+#=
 using PyCall
 metrics = pyimport("sklearn.metrics")
 
@@ -78,6 +79,7 @@ metrics.jaccard_score(val_classes[isclassified],
 isclassified = test_classes .!== nclasses;
 metrics.jaccard_score(test_classes[isclassified],
                       test_predicted_classes[isclassified],average="macro")
+=#
 
 fname = joinpath(basedir,timestamp,"results-$timestamp.nc")
 using NCDatasets
