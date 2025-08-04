@@ -1,8 +1,13 @@
+
 include("litter_classification.jl")
 
 timestamp = "20230215T223530"
 timestamp = "20230422T104137"
 timestamp = "20250404T115717"
+#timestamp = "20250515T144653"
+#timestamp = "20250519T172334"
+#timestamp = "20250519T135743"
+timestamp = "20250709T155235308"
 
 device = gpu
 
@@ -53,33 +58,95 @@ function loadall(T,sz,nbands,train_X,basedir)
     return all_bands, all_confidence, all_classes
 end
 
-
+train_bands, train_confidence, train_classes = loadall(T,sz,nbands,train_X,basedir)
 val_bands, val_confidence, val_classes = loadall(T,sz,nbands,val_X,basedir)
 test_bands, test_confidence, test_classes = loadall(T,sz,nbands,test_X,basedir)
 
-#=
+function loadall(T,sz,nbands,train_X,basedir)
+    all_bands = zeros(T,sz...,nbands,length(train_X));
+    all_confidence = zeros(Int8,sz...,length(train_X));
+    all_classes = zeros(Int8,sz...,length(train_X));
+    loadbatch!(T,basedir,train_X,sz,nbands,1:length(train_X),all_bands,all_confidence,all_classes,class_mapping)
+
+    return all_bands, all_confidence, all_classes
+end
+
+train_bands, train_confidence, train_classes = loadall(T,sz,nbands,train_X,basedir)
+val_bands, val_confidence, val_classes = loadall(T,sz,nbands,val_X,basedir)
+test_bands, test_confidence, test_classes = loadall(T,sz,nbands,test_X,basedir)
+
+####CALCULATING METRICS####
+
 using PyCall
 metrics = pyimport("sklearn.metrics")
 
+#####TRAINING DATA#####
+isclassified = train_classes .!== nclasses;
+train_jaccard_score_macro = metrics.jaccard_score(train_classes[isclassified],
+                      train_predicted_classes[isclassified],average="macro")
+
+@show train_jaccard_score_macro
+
+train_f1_score = metrics.f1_score(train_classes[isclassified],
+                 train_predicted_classes[isclassified],average="macro")
+
+@show train_f1_score 
+train_jaccard_score_nothing =  metrics.jaccard_score(train_classes[isclassified],
+                      train_predicted_classes[isclassified],average=nothing)
+
+@show train_jaccard_score_nothing 
+
+
+#####VALIDATE DATA#####
 # last class means "unclassified"
 isclassified = val_classes .!== nclasses;
-metrics.jaccard_score(val_classes[isclassified],
+val_jaccard_score_macro = metrics.jaccard_score(val_classes[isclassified],
                       val_predicted_classes[isclassified],average="macro")
 
+@show val_jaccard_score_macro
 
-metrics.f1_score(val_classes[isclassified],
+val_f1_score = metrics.f1_score(val_classes[isclassified],
                  val_predicted_classes[isclassified],average="macro")
 
-
-metrics.jaccard_score(val_classes[isclassified],
+@show val_f1_score 
+val_jaccard_score_nothing =  metrics.jaccard_score(val_classes[isclassified],
                       val_predicted_classes[isclassified],average=nothing)
 
-
-
+@show val_jaccard_score_nothing 
+####TEST DATA####
 isclassified = test_classes .!== nclasses;
-metrics.jaccard_score(test_classes[isclassified],
+test_jaccard_score_macro = metrics.jaccard_score(test_classes[isclassified],
                       test_predicted_classes[isclassified],average="macro")
-=#
+
+@show test_jaccard_score_macro
+
+test_f1_score = metrics.f1_score(test_classes[isclassified],
+                 test_predicted_classes[isclassified],average="macro")
+
+@show test_f1_score
+
+test_jaccard_score_nothing =  metrics.jaccard_score(test_classes[isclassified],
+                      test_predicted_classes[isclassified],average=nothing)
+
+@show test_jaccard_score_nothing
+
+####SAVING METRICS####
+metricsname = joinpath(basedir,timestamp,"metrics.json")
+open(metricsname,"w") do f
+    JSON3.write(f,OrderedDict(
+    "train_mean_IoU" => train_jaccard_score_macro,
+    "train_IoU" => train_jaccard_score_nothing,
+    "train_f1_score" => train_f1_score,
+    "val_mean_IoU" => val_jaccard_score_macro,
+    "val_IoU" => val_jaccard_score_nothing,
+    "val_f1_score" => val_f1_score,
+    "test_mean_IoU" => test_jaccard_score_macro,
+    "test_IoU" => test_jaccard_score_nothing,
+    "test_f1_score" => test_f1_score,
+    ))
+end
+
+
 
 fname = joinpath(basedir,timestamp,"results-$timestamp.nc")
 using NCDatasets

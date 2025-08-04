@@ -49,6 +49,7 @@ function main(T,sz,
     count_classes = counter(all_classes)
 
     ww = [1/count_classes[i] for i = 1:nclasses]
+#    ww[1] = ww[1]*10 #more weight for plastic
     ww[end] = 0 # last is unclassified
     ww = reshape(ww,(1,1,nclasses,1)) |> device
 
@@ -67,7 +68,7 @@ function main(T,sz,
     @show mean_bands
     @show std_bands
 
-    # normalize
+    # normalize all the dataset 
     all_bands = (all_bands .- mean_bands) ./ std_bands;
 
     idx = 1:batchsize
@@ -112,13 +113,14 @@ function main(T,sz,
     opt_state = Flux.setup(opt, model)
 
     Random.seed!(seed)
-
+    @show seed
+    
     ww_without_unclassfied = ww[:,:,1:end-1,1]
     confidence = all_confidence[:,:,1:batchsize]
     classes = all_classes[:,:,idx]
 
 
-    timestamp = Dates.format(Dates.now(),"yyyymmddTHHMMSS")
+    timestamp = Dates.format(Dates.now(),"yyyymmddTHHMMSSs")
     outdir = joinpath(basedir,timestamp)
     mkpath(outdir)
 
@@ -135,8 +137,12 @@ function main(T,sz,
     @time for n = 1:nepochs
         average_loss = 0.
         average_count = 0
-
-        for idx in partition(shuffle(1:size(all_bands,4)),batchsize)
+        @show n
+        
+        for idx in partition(shuffle(1:size(all_bands,4)),batchsize) #Shuffle training images
+            @show idx
+#        for idx in partition(1:size(all_bands,4),batchsize) #No Shuffle
+#            @show idx
             #loadbatch!(T,basedir,train_X,sz,nbands,idx,bands,confidence,classes,class_mapping)
             #bands = all_bands[:,:,:,idx]
             #confidence = all_confidence[:,:,idx]
@@ -146,28 +152,38 @@ function main(T,sz,
             # edges will be filled with zeros and "unclassfied" class
 
             θ = 360*rand()
+
+                   
             rotate_center!(bands,all_bands[:,:,:,idx],θ,0)
-            #rotate_center!(confidence,all_confidence[:,:,idx],θ,0)
+#            rotate_center!(confidence,all_confidence[:,:,idx],θ,0)
             rotate_center!(classes, all_classes[:,:,idx],θ,nclasses)
 
             if rand(1:2) == 1
                 bands = reverse(bands,dims=1)
+ #               confidence = reverse(confidence,dims=1)
                 classes = reverse(classes,dims=1)
             end
 
             addnoise!(bands,std_noise_bands)
             # TO GPU
-            #confidence = confidence |> device
+            #confidence = confidence |> device FAIT BUGGER SI ACTIVé
 
             X = bands |> device;
             Y = permutedims( onehotbatch(classes,1:nclasses), (2,3,1,4)) |> device;
 
             Y_without_unclassfied = Y[:,:,1:end-1,:]
 
+  #          confidence = reshape(confidence,size(confidence,1),size(confidence,2),1,size(confidence,3))
+
+
             loss,grads = Flux.withgradient(model) do m
                 yhat = m(X);
+                
+                loss = sum(-sum(ww_without_unclassfied .* Y_without_unclassfied .* logsoftmax(yhat; dims=3); dims=3)) 
+                #confidence taken into account in loss function
+                
+#                loss = sum(-sum(((4 .-confidence)./3).*ww_without_unclassfied .* Y_without_unclassfied .* logsoftmax(yhat; dims=3); dims=3))
 
-                loss = sum(-sum(ww_without_unclassfied .* Y_without_unclassfied .* logsoftmax(yhat; dims=3); dims=3))
 
                 if beta2 != 0
                     loss += T(beta2) * sum(parameters) do p
@@ -280,11 +296,100 @@ function main(T,sz,
     @show test_stat.mean_IoU
     @show train_stat.mean_IoU
 
+    #######Calculating the metrics #########
+    
+    train_bands, train_confidence, train_classes = loadall(T,sz,nbands,train_X,basedir)
+    val_bands, val_confidence, val_classes = loadall(T,sz,nbands,val_X,basedir)
+    test_bands, test_confidence, test_classes = loadall(T,sz,nbands,test_X,basedir)
+
+    ####CALCULATING METRICS####
+
+
+    #####TRAINING DATA#####
+    isclassified = train_classes .!== nclasses;
+    train_jaccard_score_macro = metrics.jaccard_score(train_classes[isclassified],
+                      train_predicted_classes[isclassified],average="macro")
+
+
+
+    train_f1_score = metrics.f1_score(train_classes[isclassified],
+                 train_predicted_classes[isclassified],average="macro")
+
+
+    train_jaccard_score_nothing =  metrics.jaccard_score(train_classes[isclassified],
+                      train_predicted_classes[isclassified],average=nothing)
+
+
+    #####VALIDATE DATA#####
+    # last class means "unclassified"
+    isclassified = val_classes .!== nclasses;
+    val_jaccard_score_macro = metrics.jaccard_score(val_classes[isclassified],
+                      val_predicted_classes[isclassified],average="macro")
+
+
+
+    val_f1_score = metrics.f1_score(val_classes[isclassified],
+                 val_predicted_classes[isclassified],average="macro")
+
+
+    val_jaccard_score_nothing =  metrics.jaccard_score(val_classes[isclassified],
+                      val_predicted_classes[isclassified],average=nothing)
+
+
+    ####TEST DATA####
+    isclassified = test_classes .!== nclasses;
+    test_jaccard_score_macro = metrics.jaccard_score(test_classes[isclassified],
+                      test_predicted_classes[isclassified],average="macro")
+
+
+
+    test_f1_score = metrics.f1_score(test_classes[isclassified],
+                 test_predicted_classes[isclassified],average="macro")
+
+
+
+    test_jaccard_score_nothing =  metrics.jaccard_score(test_classes[isclassified],
+                      test_predicted_classes[isclassified],average=nothing)
+
+
+    ####SAVING METRICS####
+    metricsname = joinpath(basedir,timestamp,"metrics.json")
+    open(metricsname,"w") do f
+        JSON3.write(f,OrderedDict(
+            "train_mean_IoU" => train_jaccard_score_macro,
+            "train_IoU" => train_jaccard_score_nothing,
+            "train_f1_score" => train_f1_score,
+            "val_mean_IoU" => val_jaccard_score_macro,
+            "val_IoU" => val_jaccard_score_nothing,
+            "val_f1_score" => val_f1_score,
+            "test_mean_IoU" => test_jaccard_score_macro,
+            "test_IoU" => test_jaccard_score_nothing,
+            "test_f1_score" => test_f1_score,
+        ))
+    end
+
+
+    fname = joinpath(basedir,timestamp,"results-$timestamp.nc")
+
+    ds = NCDataset(fname,"c")
+    defVar(ds,"val_predicted_classes",val_predicted_classes,("x","y","val_sample"))
+    defVar(ds,"test_predicted_classes",test_predicted_classes,("x","y","test_sample"))
+
+    defVar(ds,"val_classes",val_classes,("x","y","val_sample"))
+    defVar(ds,"test_classes",test_classes,("x","y","test_sample"))
+
+    defVar(ds,"val_X",val_X,("val_sample",))
+    defVar(ds,"test_X",test_X,("test_sample",))
+
+    close(ds)
+
+    
+
     return train_stat,val_stat,test_stat
 end
 
 
-Random.seed!(Dates.value(Dates.now()))
+
 
 # # random search
 # lr = rand([0.0001,0.0003,0.001])
@@ -299,16 +404,42 @@ Random.seed!(Dates.value(Dates.now()))
 
 
 
+#Seed reevaluated with time
+#Random.seed!(Dates.value(Dates.now()))
+#@show rand()
+
 # best values so far
 lr = 0.0001
-nepochs = 1746
-#nepochs = 2 # testing
+# nepochs = 1746
+
+nepochs = 1000 # testing
 activation = selu
+#activation = relu
 nchannels_base = 64
 nchannels = (nchannels_base,nchannels_base*2,nchannels_base*4)
-std_noise_bands = 0
+#beta2 = parse(Float32,ARGS[1])
+#beta2 = 0.000001f0
+#beta2 = T(10 .^ (-2 + -5 * rand())) #need a not fixed seed
+beta2 = 0.0f0
+#beta2 = 0.0001f0
+#std_noise_bands = parse(Float32,ARGS[2])
+std_noise_bands = 0.0
+#std_noise_bands = 0.0001
 clip_grad_value = 5
-beta2 = 0.f0
+
+
+#Seed fixed to get same initial weights
+seed = 1234
+Random.seed!(seed)
+@show rand()
+metrics = pyimport("sklearn.metrics")
+
+#CUDA.seed!(seed)
+#random_cuda = CUDA.rand(1)
+#@show typeof(random_cuda)
+#@show Array(random_cuda)[1]
+
+
 
 @time train_stat,val_stat,test_stat = main(
     T,sz,basedir,train_X,test_X,val_X,class_mapping,nbands,nclasses;
