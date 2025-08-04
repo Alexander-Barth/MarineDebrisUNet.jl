@@ -10,9 +10,11 @@ using Interpolations
 using JSON3
 using OneHotArrays
 using PyPlot
+using PyCall
 using Random
 using Statistics
 using Zygote
+using NCDatasets
 
 # load a single TIFF file and concatenate all bands
 function load(fname)
@@ -46,6 +48,16 @@ function loadbatch!(T,basedir,train_X,sz,nbands,idx,bands,confidence,classes,cla
 end
 
 
+function loadall(T,sz,nbands,train_X,basedir)
+    all_bands = zeros(T,sz...,nbands,length(train_X));
+    all_confidence = zeros(Int8,sz...,length(train_X));
+    all_classes = zeros(Int8,sz...,length(train_X));
+    loadbatch!(T,basedir,train_X,sz,nbands,1:length(train_X),all_bands,all_confidence,all_classes,class_mapping)
+
+    return all_bands, all_confidence, all_classes
+    end
+
+
 # rotate the image `bands` by θ (in degress)
 function rotate_center!(bands_rot,bands,θ,extrapval)
     sinθ,cosθ = sincosd(θ)
@@ -77,6 +89,66 @@ function showsize(tag)
         return x
     end
 end
+
+#Uncomment to normalise after each convolution layer
+
+#=
+function ConvBatchNorm(kernelsize, (in, out), activation = identity; kwargs...)
+    return Chain(
+    Conv(kernelsize, in =>out; bias=false, kwargs...),
+    BatchNorm(out),
+        activation)
+end
+
+
+# individual block of a UNet with BatchNorm before activation function
+function unet_block(l,nchannels,nbands,nclasses,activation)
+    nchan = nchannels[l]
+    last_activation = activation
+    if l == 1
+        nin,nout = nbands,nclasses
+        last_activation = identity
+    else
+        nin = nchannels[l-1]
+        nout = nchannels[l]
+    end
+    @show l,nchannels,nin,nout,nchan
+
+    if l == length(nchannels)
+        return ConvBatchNorm((3,3),nchannels[l-1] => nchan,activation,pad = SamePad())
+        #return identity
+    end
+
+    inner = unet_block(l+1,nchannels,nbands,nclasses,activation)
+
+
+    return Chain(
+        #showsize("A $nin"),
+        ConvBatchNorm((3,3),nin => nchan,activation,pad = SamePad()),
+        #showsize("B $nchan"),
+        ConvBatchNorm((3,3),nchan => nchan,activation,pad = SamePad()),
+        SkipConnection(
+            Chain(
+                MaxPool((2,2)),
+                inner,
+                #showsize("C $(nchannels[l+1]) => $nchan"),
+                #Upsample(mode,scale=(2,2)),
+                ConvTranspose((2,2),nchannels[l+1] => nchan,#=activation,=#stride=2),
+                #showsize("D"),
+            ),
+            cat_channels
+        ),
+        #showsize("G $(2*nchan)"),
+        ConvBatchNorm((3,3),2*nchan => nchan,activation,pad = SamePad()),
+        ConvBatchNorm((3,3),nchan => nout,last_activation,pad = SamePad()),
+        #showsize("out level $nout"),
+    )
+end
+
+
+=#
+
+#Comment if ConvBatchNorm is used
 
 # individual block of a UNet
 function unet_block(l,nchannels,nbands,nclasses,activation)
@@ -121,6 +193,8 @@ function unet_block(l,nchannels,nbands,nclasses,activation)
         #showsize("out level $nout"),
     )
 end
+
+
 
 # plot the matrix classes
 function classplot(classes; nclasses = 12, unclassified = nclasses)
@@ -242,6 +316,10 @@ end
 
 # add noise to bands with the prescribed standard deviation
 function addnoise!(bands,stddev)
+    if stddev ==0
+        return
+    end
+    
     @inbounds for i in eachindex(bands)
         bands[i] += stddev * randn(eltype(bands))
     end
