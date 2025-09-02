@@ -49,7 +49,7 @@ function main(T,sz,
     count_classes = counter(all_classes)
 
     ww = [1/count_classes[i] for i = 1:nclasses]
-#    ww[1] = ww[1]*10 #more weight for plastic
+#    ww[1] = ww[1]*5 #more weight for plastic
     ww[end] = 0 # last is unclassified
     ww = reshape(ww,(1,1,nclasses,1)) |> device
 
@@ -137,10 +137,10 @@ function main(T,sz,
     @time for n = 1:nepochs
         average_loss = 0.
         average_count = 0
-        @show n
+#        @show n
         
         for idx in partition(shuffle(1:size(all_bands,4)),batchsize) #Shuffle training images
-            @show idx
+#            @show idx
 #        for idx in partition(1:size(all_bands,4),batchsize) #No Shuffle
 #            @show idx
             #loadbatch!(T,basedir,train_X,sz,nbands,idx,bands,confidence,classes,class_mapping)
@@ -153,36 +153,32 @@ function main(T,sz,
 
             θ = 360*rand()
 
-                   
-            rotate_center!(bands,all_bands[:,:,:,idx],θ,0)
-#            rotate_center!(confidence,all_confidence[:,:,idx],θ,0)
+            rotate_center!(bands,all_bands[:,:,:,idx],θ,0) #rotate_center can not take CuArrays from gpu beacause uses scalar iteration
+            rotate_center!(confidence,all_confidence[:,:,idx],θ,0)
             rotate_center!(classes, all_classes[:,:,idx],θ,nclasses)
 
             if rand(1:2) == 1
                 bands = reverse(bands,dims=1)
- #               confidence = reverse(confidence,dims=1)
+                confidence = reverse(confidence,dims=1)
                 classes = reverse(classes,dims=1)
             end
 
             addnoise!(bands,std_noise_bands)
+
             # TO GPU
-            #confidence = confidence |> device FAIT BUGGER SI ACTIVé
-
-            X = bands |> device;
+            X = bands |> device; #copied in gpu, bands still in cpu to be used in next iteration in rotate_center
             Y = permutedims( onehotbatch(classes,1:nclasses), (2,3,1,4)) |> device;
-
+            confidence_gpu = Float32.(confidence) |> device; #has to be copied in gpu for loss function calculation
             Y_without_unclassfied = Y[:,:,1:end-1,:]
 
-  #          confidence = reshape(confidence,size(confidence,1),size(confidence,2),1,size(confidence,3))
-
-
+            
             loss,grads = Flux.withgradient(model) do m
                 yhat = m(X);
                 
                 loss = sum(-sum(ww_without_unclassfied .* Y_without_unclassfied .* logsoftmax(yhat; dims=3); dims=3)) 
                 #confidence taken into account in loss function
                 
-#                loss = sum(-sum(((4 .-confidence)./3).*ww_without_unclassfied .* Y_without_unclassfied .* logsoftmax(yhat; dims=3); dims=3))
+#                loss = sum(-sum(((4 .- reshape(confidence_gpu, sz[1], sz[2], 1, batchsize))./3).*ww_without_unclassfied .* Y_without_unclassfied .* logsoftmax(yhat; dims=3); dims=3))
 
 
                 if beta2 != 0
@@ -248,29 +244,37 @@ function main(T,sz,
 
     BSON.@save joinpath(basedir, "litter_classification_model_$(timestamp).bson") model_cpu mean_bands_cpu std_bands_cpu lr nepochs batchsize nclasses losses val_stats std_noise_bands
 
-
+    train_predicted_classes = zeros(Int8,sz...,length(train_X))
+    val_predicted_classes = zeros(Int8,sz...,length(val_X))
+    test_predicted_classes = zeros(Int8,sz...,length(test_X))
 
     doplot = false;
     resdir = joinpath(basedir,timestamp,"train")
     train_stat = compare_result(T,sz,device,model,nbands,nclasses,train_X,basedir,resdir,
-                                doplot = doplot,
-                                mean_bands = mean_bands,
-                                std_bands = std_bands)
+                            doplot = doplot,
+                            mean_bands = mean_bands,
+                            std_bands = std_bands,
+                            predicted_classes = train_predicted_classes)
 
+
+    val_predicted_classes = zeros(Int8,sz...,length(val_X))
     resdir = joinpath(basedir,timestamp,"val")
     val_stat = compare_result(T,sz,device,model,nbands,nclasses,val_X,basedir,resdir;
-                              doplot = doplot,
-                              mean_bands = mean_bands,
-                              std_bands = std_bands)
+                          doplot = doplot,
+                          mean_bands = mean_bands,
+                          std_bands = std_bands,
+                          predicted_classes = val_predicted_classes)
 
-
+    test_predicted_classes = zeros(Int8,sz...,length(test_X))
     resdir = joinpath(basedir,timestamp,"test")
-    test_stat = compare_result(T,sz,device,model,nbands,nclasses,test_X,basedir,resdir;
-                               doplot = doplot,
-                               mean_bands = mean_bands,
-                               std_bands = std_bands)
+    test_stat = compare_result(T,sz,device,model,nbands,nclasses,test_X,basedir,resdir,
+                           doplot = doplot,
+                           mean_bands = mean_bands,
+                           std_bands = std_bands,
+                           predicted_classes = test_predicted_classes)
 
 
+    
     paramsname = joinpath(basedir,timestamp,"params.json")
     open(paramsname,"w") do f
         JSON3.write(f,OrderedDict(
@@ -411,20 +415,20 @@ end
 # best values so far
 lr = 0.0001
 # nepochs = 1746
-
-nepochs = 1000 # testing
+nepochs = 1000
+#nepochs = 1000 #testing
 activation = selu
 #activation = relu
 nchannels_base = 64
 nchannels = (nchannels_base,nchannels_base*2,nchannels_base*4)
 #beta2 = parse(Float32,ARGS[1])
-#beta2 = 0.000001f0
+#beta2 = 0.007702694f0
 #beta2 = T(10 .^ (-2 + -5 * rand())) #need a not fixed seed
+#beta2 = 8.2381106f-5
 beta2 = 0.0f0
-#beta2 = 0.0001f0
 #std_noise_bands = parse(Float32,ARGS[2])
+#std_noise_bands = 0.00175
 std_noise_bands = 0.0
-#std_noise_bands = 0.0001
 clip_grad_value = 5
 
 
