@@ -1,7 +1,6 @@
 using ArchGDAL
 using BSON
 using Base.Iterators: partition
-using CUDA
 using DataFrames
 using DataStructures
 using Dates
@@ -15,6 +14,13 @@ using Random
 using Statistics
 using Zygote
 using NCDatasets
+
+if !isnothing(Sys.which("nvidia-smi"))
+    import CUDA, cuDNN
+else
+    import AMDGPU
+    AMDGPU.EAGER_GC[] = true
+end
 
 # load a single TIFF file and concatenate all bands
 function load(fname)
